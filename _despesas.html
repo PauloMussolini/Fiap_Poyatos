@@ -1,0 +1,558 @@
+<html lang="pt-BR">
+<head>
+	<script type="text/javascript" src="asset/js/help/Despesa.help.js"></script>	
+<style>
+		.form-control{
+			height:17px;
+		}
+#wndOperacao table tr td{
+	border:none !important;
+	height:15px !important;
+}
+#wndOperacao #frmDespesa table td{
+	padding: 3px !important;
+}		
+.ui-datepicker {    
+	width: 216px !important;
+    height: auto;
+    font: 9pt Arial, sans-serif;
+    border: thick solid red;
+}
+</style>
+</head>
+<body>
+
+	<div id="grdDespesa" style="width: 75%; margin:auto; color: Black;"  class="animated fadeInLeft"></div>
+
+	<div id="wndOperacao" class="k-window-content" style="display:none">
+	
+		<section class="content" style="width:97%">
+
+				<form id="frmDespesa">
+					<table style="width:100%; border:none">
+						<colgroup>
+							<col width="20%"/>
+							<col width="60%"/>
+							<col width="20%"/>
+						</colgroup>
+						<body>
+							<tr>
+								<td>
+									<label>Data</label>
+								</td>
+								<td >
+									<input id="dtDespesa" title="Data da Despesa" required="" style="width:50%;"/>
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<label>Tipo</label>
+								</td>
+								<td>
+									<input id="tpDespesa"  value="1" required="" style="width:75%;"/>
+								</td>
+								<td>
+									<div class="col-sm-6">
+										<button id="btnOpDespesa" type="submit" class="btn btn-block btn-primary">Incluir</button>
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<label>Descrição</label>
+								</td>
+								<td >
+									<input id="dcDespesa" type="text" class="form-control" placeholder="Descrição" maxlength="50" required="" style="width:95%;"/>
+								</td>
+								<td>
+									<div class="col-sm-6">
+										<button type="button" class="btn btn-block btn-danger close-button">Cancelar</button>
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<td >
+									<label>Valor</label>
+								</td>
+								<td >
+									<input id="vlDespesa" type="number" title="Valor da Despesa"  min="0"  style="width: 100%;" />
+                       
+								</td>
+								<td>
+								</td>
+							</tr>
+
+						
+						</body>
+					</table>
+						
+				</form>
+									
+		
+		</section>
+	</div>
+</body>	
+	
+<script type="text/javascript">
+var cdDespesa = 0;
+var dtDespesa = '';
+var dcDespesa = '';
+var vlDespesa = 0;
+var tpOperacao='';
+var objBanco;
+var db = null;	
+
+var despesaData = new Array();
+var ndespesa = new Array();
+
+fnRecuperaTipoDespesa = function(){
+	if(window.indexedDB) {
+		var db = null;
+		var objBanco = window.indexedDB.open("despesasApp", 1);
+		objBanco.onsuccess = function(evento){
+			console.log("Conexão realizada com sucesso!");
+			db = evento.target.result;
+			
+			//Recupera os tipos
+			var tx = db.transaction(["despesasTipo"], "readonly");
+			despesaStore = tx.objectStore("despesasTipo");
+			
+			var request = despesaStore.openCursor();
+			request.onerror = function(evento){
+				console.log("Erro na consulta");
+			}
+			
+			//ndespesa = [];
+			
+			request.onsuccess = function(evento){
+				var cursor = evento.target.result;
+				if(cursor){			
+					var despesa = cursor.value;
+
+				//	console.log('despesa: ',despesa);
+
+					var valueToPush = {"text": despesa.name, "value": despesa.codigo };
+
+					ndespesa.push(valueToPush); 
+
+				//	console.log('ndespesa: ',ndespesa);
+					
+					cursor.continue();
+				}
+
+				$("#tpDespesa").kendoDropDownList({
+					dataTextField: "text",
+					dataValueField: "value",
+					dataSource: ndespesa,
+					index: 0
+					// change: onChange
+				});
+
+			}
+			
+		}
+		
+		objBanco.onerror = function(evento){
+			console.log("Erro na conexão com banco de dados");
+		}
+	} else {
+		console.log("Banco de dados IndexedDB não suportado");
+	}
+
+};
+
+fnRecuperaDados = function(){
+	if(window.indexedDB) {
+		var db = null;
+		var objBanco = window.indexedDB.open("despesasApp", 1);
+		objBanco.onsuccess = function(evento){
+			console.log("Conexão realizada com sucesso!");
+			db = evento.target.result;
+			
+			//CONSULTA
+			var tx = db.transaction(["despesas"], "readonly");
+			despesaStore = tx.objectStore("despesas");
+			
+			var request = despesaStore.openCursor();
+			request.onerror = function(evento){
+				console.log("Erro na consulta");
+			}
+			
+			despesaData = [];
+			
+			request.onsuccess = function(evento){
+				var cursor = evento.target.result;
+				if(cursor){		
+					var despesaCursor = cursor.value;
+
+					var valueToPush = {"codigo": despesaCursor.codigo, "dataD": despesaCursor.dataD,"tipo": despesaCursor.tipo, "descricao": despesaCursor.descricao, "valor": despesaCursor.valor };
+
+					despesaData.push(valueToPush); 
+					
+					cursor.continue();
+				}
+				fnMontaGrid();
+			}
+			
+		}
+		
+		objBanco.onerror = function(evento){
+			console.log("Erro na conexão com banco de dados");
+		}
+		
+		objBanco.onupgradeneeded = function(evento){
+			db = evento.target.result;
+			var objDespesas = db.createObjectStore("despesas", 
+			{ keyPath: "codigo", autoIncrement: true });
+		}
+	} else {
+		console.log("Banco de dados IndexedDB não suportado");
+	}
+};
+
+$(function() {
+	fnLimpaOperacoes();
+	$('#btnIncluir').prop('disabled', false);	
+
+	
+	fnAnima('Despesas');
+
+	//Monta calendário
+	//$("#dtDespesa").closest("span.k-dropdown").width(400);
+	$("#dtDespesa").kendoDatePicker(
+		{format: "dd/MM/yyyy"}
+	);
+
+	// Valor
+	$("#vlDespesa").kendoNumericTextBox({
+                        format: "c",
+                        decimals: 2
+                    });	
+
+	if(window.indexedDB) {
+
+		objBanco = window.indexedDB.open("despesasApp", 1);
+		objBanco.onsuccess = function(evento){
+			console.log("Conexão realizada com sucesso!");
+			db = evento.target.result;
+		}
+		
+		objBanco.onerror = function(evento){
+			console.log("Erro na conexão com banco de dados");
+		}
+		
+		objBanco.onupgradeneeded = function(evento){
+			db = evento.target.result;
+			var objDespesas = db.createObjectStore("despesas", 
+			{ keyPath: "codigo", autoIncrement: true });
+			var objTipoDespesa = db.createObjectStore("despesasTipo", 
+			{ keyPath: "codigo", autoIncrement: true });
+		}
+		
+	} else {
+		console.log("Banco de dados IndexedDB não suportado");
+	}
+
+	fnRecuperaTipoDespesa();
+
+	fnRecuperaDados();
+
+	const form = document.getElementById('frmDespesa');
+ 		form.addEventListener('submit', fnAtualiza);
+	
+	//	var btnOp = document.getElementById('#btnOpDespesa')
+
+	 // Operações
+	$('#btnIncluir').click(function() {
+		var myWindow = $("#wndOperacao");
+		tpOperacao = 'I';
+		myWindow.kendoWindow({
+			width: "650px",
+			maxHeight: 600,
+			position: {
+				top: 50,
+				left: "30%"
+			},
+			visible: false,
+			modal: true,
+			resizable: false,
+			actions: [
+				"Close"
+			]
+
+		}).data("kendoWindow").open();  
+		$('#wndOperacao_wnd_title').html('Inclusão de Despesa'); 
+		$('#btnOpDespesa').text('Incluir');
+	});			
+
+	$('#btnAlterar').click(function() {
+
+		$('#dtDespesa').val(dtDespesa);
+		$('#tpDespesa').val(tpDespesa);
+		$('#dcDespesa').val(dcDespesa);
+		$('#vlDespesa').data("kendoNumericTextBox").value(vlDespesa);
+
+		tpOperacao = 'A';
+		var myWindow = $("#wndOperacao");
+
+		myWindow.kendoWindow({
+			width: "650px",
+			maxHeight: 600,
+			position: {
+				top: 50,
+				left: "30%"
+			},
+			visible: false,
+			modal: true,
+			resizable: false,
+			actions: [
+				"Close"
+			]
+		
+		}).data("kendoWindow").open();	 
+		$('#wndOperacao_wnd_title').html('Alteração de Despesa'); 
+		$('#btnOpDespesa').text('Alterar');
+	});		
+	$('#btnExcluir').click(function(event) {
+		event.preventDefault();
+		var success = function(){
+			fnExcluiDespesa();
+		}
+		var cancel = function(){
+			alert('Operação cancelada!');
+		};
+			showConfirmation("Excluir Despesa " + dtDespesa, "Confirma exclusão da Despesa selecionada?", success, cancel);
+	});			
+
+	$('#btnExportar').unbind('click').on('click', function(){
+		fnExportaExcel($('#grdDespesa'));
+	});	
+});// Final de Function
+
+fnAtualiza = function(){
+
+if (tpOperacao =='I')
+	fnIncluiDespesa()
+else
+	fnAlteraDespesa()
+
+};
+
+
+// Fecha Popups
+$(".close-button").click(function(){
+// call 'close' method on nearest kendoWindow
+$(this).closest("[data-role=window]").data("kendoWindow").close();
+
+});	
+	  
+fnOnDataBound = function(arg){
+	$('#btnExportar').prop('disabled', false);	
+};	  
+
+fnOnChange = function(arg){
+	// Guarda dados da linha selecionada...
+	
+    var grid = $("#grdDespesa").data("kendoGrid");
+    selectedGridItem = grid.dataItem(grid.select());
+	
+	cdDespesa = selectedGridItem.codigo;
+	dtDespesa = selectedGridItem.dataD;
+	dcDespesa = selectedGridItem.descricao;
+	vlDespesa = selectedGridItem.valor;
+
+	console.log(cdDespesa);
+	
+	$('#btnExcluir').prop('disabled', false);
+	$('#btnAlterar').prop('disabled', false);
+	
+};	  
+
+fnExcluiDespesa = function(){
+	alert('Despesa será Excluída!'); // URL de Exclusão
+};		
+
+function checkbox(ativo) {   
+  if (ativo == true) {
+    return '<input type="checkbox"  onclick="return false;" value="' + ativo + '" checked="checked" />';
+  } else {
+    return '<input type="checkbox"  onclick="return false;" value="' + ativo + '" />';
+  }
+};  
+$('#btnAjuda').unbind('click').click(function () {
+	var tour = new DespesaHelp();
+	tour.iniciar();
+});
+
+fnMontaGrid = function(){
+
+	console.log(despesaData);
+	var dataSourceDespesa = new kendo.data.DataSource({
+			data: despesaData, //Despesas,
+			pageSize: 10,
+			schema: {
+			  model: {
+				fields: {
+				codigo: { editable: false},
+				dataD: { editable: false },
+				tipo:{ editable: false },
+				descricao: { editable: false },
+				valor: { editable: false }
+				}
+			  }
+			}	
+		});		
+		
+		// Grid
+		kendo.culture("pt-BR");
+        // Grid de Despesas
+        $("#grdDespesa").kendoGrid({
+			dataSource: dataSourceDespesa,
+			//autoBind: false,
+            height: 455,
+            width: '60%',
+            groupable: true,
+            sortable: true,
+			filterable: true,
+			selectable: true,
+			columnMenu: true,
+            pageable: {
+                refresh: true,
+                pageSizes: true,
+                buttonCount: 5
+            },
+			change: fnOnChange,
+			dataBound: fnOnDataBound,						
+            columns: [
+				{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},				
+				field: "codigo",
+				 
+				hidden: true,
+				attributes:{ class:"text-center" } 
+			},
+				{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},				
+				field: "dataD",
+				title: "Data", 
+				width: 120,
+				attributes:{ class:"text-center" } 
+			},{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},				
+				field: "tipo",
+                title: "Tipo", 
+                width: 210,
+				attributes:{ class:"text-center" } 
+			},  
+			{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},	
+				attributes: {
+						style: "font-weight: bold; text-align:left; vertical-align:middle;"
+						},	
+			 	field: "descricao",
+                title: "Descrição", 
+                width: 300
+            },
+			{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},	
+				attributes: {
+						style: "font-weight: bold; text-align:left; vertical-align:middle;"
+						},	
+			 	field: "valor",
+				title: "Valor", 
+				format:"{0:c}", 
+                width: 150
+			}
+		]
+        });		
+};
+
+fnIncluiDespesa = function(){
+		
+			//Capturar os valores do formulário..
+			dtDespesa = $('#dtDespesa').val();
+			tpDespesa = $('#tpDespesa').data("kendoDropDownList").text();
+			dcDespesa = $('#dcDespesa').val();
+			vlDespesa = $('#vlDespesa').val();
+
+			//JSON
+			var despesa = {dataD: dtDespesa,
+							tipo: tpDespesa,
+							   descricao: dcDespesa,
+							   valor: vlDespesa};
+			console.log(despesa);
+
+			var tx = db.transaction(["despesas"], "readwrite");
+			var despesaStore = tx.objectStore("despesas");
+			despesaStore.put(despesa);
+
+			fnRecuperaDados();
+
+			$("#frmDespesa .close-button").click();
+			$("#frmDespesa").trigger('reset');
+		
+};
+
+fnAlteraDespesa = function(){
+
+
+	dtDespesa = $('#dtDespesa').val();
+	tpDespesa = $('#tpDespesa').data("kendoDropDownList").text();
+	dcDespesa = $('#dcDespesa').val();
+	vlDespesa = $('#vlDespesa').data("kendoNumericTextBox").value();;
+
+	var tx = db.transaction(["despesas"], "readwrite");
+	var despesaStore = tx.objectStore("despesas");
+
+
+
+	var request = despesaStore.get(cdDespesa);
+
+	request.onerror = function(event) {
+  		alert('Registro não encontrado');
+	};
+	request.onsuccess = function(event) {
+		// Get the old value that we want to update
+		var data = event.target.result;
+		console.log(data);
+		// update the value(s) in the object that you want to change
+		data.dataD = dtDespesa;
+		data.descricao = dcDespesa;
+		data.tipo = tpDespesa;
+		data.valor = vlDespesa;
+
+		// Put this updated object back into the database.
+		var requestUpdate = despesaStore.put(data);
+		requestUpdate.onerror = function(event) {
+			alert('Erro');
+		};
+		requestUpdate.onsuccess = function(event) {
+			$("#frmDespesa .close-button").click();
+			$("#frmDespesa").trigger('reset');
+			fnRecuperaDados();
+		};
+	};
+
+
+	fnExcluiDespesa = function(idDespesa){
+		// Confirmação
+		var request = db.transaction(["Despesas"], "readwrite")
+                .objectStore("customers")
+                .delete(idDespesa);
+		request.onsuccess = function(event) {
+		// It's gone!
+		};		
+	}
+}
+</script>
+</html>

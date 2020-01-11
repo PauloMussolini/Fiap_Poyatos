@@ -1,0 +1,440 @@
+<html lang="pt-BR">
+<head>
+	<script type="text/javascript" src="asset/js/help/tipoDespesa.help.js"></script>	
+<style>
+		.form-control{
+			height:17px;
+		}
+#wndOperacao table tr td{
+	border:none !important;
+	height:15px !important;
+}
+#wndOperacao #frmTipoDespesa table td{
+	padding: 3px !important;
+}		
+</style>
+</head>
+<body>
+
+	<div id="grdTipoDespesa" style="width: 75%; margin:auto; color: Black;"  class="animated fadeInLeft"></div>
+
+	<div id="wndOperacao" class="k-window-content" style="display:none">
+	
+		<section class="content" style="width:97%">
+
+				<form id="frmTipoDespesa">
+					<table style="width:100%; border:none">
+						<colgroup>
+							<col width="20%"/>
+							<col width="60%"/>
+							<col width="20%"/>
+						</colgroup>
+						<body>
+							<tr>
+								<td>
+									<label>Nome</label>
+								</td>
+								<td >
+									<input id="nmTipoDespesa" type="text" class="form-control" placeholder="Nome" maxlength="20" required="" style="width:75%;"/>
+								</td>
+								<td>
+									<div class="col-sm-6">
+										<button id="btnOpTipoDespesa" type="submit" class="btn btn-block btn-primary">Incluir</button>
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<label>Descrição</label>
+								</td>
+								<td >
+									<input id="dcTipoDespesa" type="text" class="form-control" placeholder="Descrição" maxlength="50" required="" style="width:95%;"/>
+								</td>
+								<td>
+									<div class="col-sm-6">
+										<button type="button" class="btn btn-block btn-danger close-button">Cancelar</button>
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<td >
+									<label>Ativo</label>
+								</td>
+								<td style="text-align:left">
+									<input id="projDesc" type="checkbox" class="form-control" style="width:25px"/>
+								</td>
+								<td>
+								</td>
+							</tr>
+
+						
+						</body>
+					</table>
+						
+				</form>
+									
+		
+		</section>
+	</div>
+</body>	
+	
+<script type="text/javascript">
+var cdTipoDespesa = 0;
+var nmTipoDespesa = '';
+var dcTipoDespesa = '';
+var tpOperacao='';
+var objBanco;
+var db = null;	
+
+var nDespesaTipo = new Array();
+
+fnRecuperaDados = function(){
+	if(window.indexedDB) {
+		var db = null;
+		var objBanco = window.indexedDB.open("despesasApp", 1);
+		objBanco.onsuccess = function(evento){
+			console.log("Conexão realizada com sucesso!");
+			db = evento.target.result;
+			
+			//CONSULTA
+			var tx = db.transaction(["despesasTipo"], "readonly");
+			despesaStore = tx.objectStore("despesasTipo");
+			
+			var request = despesaStore.openCursor();
+			request.onerror = function(evento){
+				console.log("Erro na consulta");
+			}
+			
+			nDespesaTipo = [];
+			
+			request.onsuccess = function(evento){
+				var cursor = evento.target.result;
+				if(cursor){		
+					var despesa = cursor.value;
+
+					var valueToPush = {"codigo": despesa.codigo,"nmTipoDespesa": despesa.name, "dcTipoDespesa": despesa.descricao, "ativo": despesa.ativo };
+
+					nDespesaTipo.push(valueToPush); 
+					
+					cursor.continue();
+				}
+				fnMontaGrid();
+			}
+			
+		}
+		
+		objBanco.onerror = function(evento){
+			console.log("Erro na conexão com banco de dados");
+		}
+		
+		objBanco.onupgradeneeded = function(evento){
+			db = evento.target.result;
+			var objDespesas = db.createObjectStore("despesas", 
+			{ keyPath: "codigo", autoIncrement: true });
+			var objTipoDespesa = db.createObjectStore("despesasTipo", 
+			{ keyPath: "codigo", autoIncrement: true });
+		}
+	} else {
+		console.log("Banco de dados IndexedDB não suportado");
+	}
+};
+
+$(function() {
+	fnLimpaOperacoes();
+	$('#btnIncluir').prop('disabled', false);	
+	$('#btnExcluir').hide();	
+	
+	fnAnima('Tipos de Despesa');
+
+	if(window.indexedDB) {
+
+		objBanco = window.indexedDB.open("despesasApp", 1);
+		objBanco.onsuccess = function(evento){
+			console.log("Conexão realizada com sucesso!");
+			db = evento.target.result;
+		}
+		
+		objBanco.onerror = function(evento){
+			console.log("Erro na conexão com banco de dados");
+		}
+		
+		objBanco.onupgradeneeded = function(evento){
+			db = evento.target.result;
+			var objDespesas = db.createObjectStore("despesas", 
+			{ keyPath: "codigo", autoIncrement: true });
+			var objTipoDespesa = db.createObjectStore("despesasTipo", 
+			{ keyPath: "codigo", autoIncrement: true });
+		}
+		
+	} else {
+		console.log("Banco de dados IndexedDB não suportado");
+	}
+
+
+
+	fnRecuperaDados();
+
+	const form = document.getElementById('frmTipoDespesa');
+ 		form.addEventListener('submit', fnAtualiza);
+	
+	//	var btnOp = document.getElementById('#btnOpTipoDespesa')
+
+	 // Operações
+	$('#btnIncluir').click(function() {
+		var myWindow = $("#wndOperacao");
+		tpOperacao = 'I';
+		myWindow.kendoWindow({
+			width: "650px",
+			maxHeight: 600,
+			position: {
+				top: 50,
+				left: "30%"
+			},
+			visible: false,
+			modal: true,
+			resizable: false,
+			actions: [
+				"Close"
+			]
+
+		}).data("kendoWindow").open();  
+		$('#wndOperacao_wnd_title').html('Inclusão de Tipo de Despesa'); 
+		$('#btnOpTipoDespesa').text('Incluir');
+	});			
+
+	$('#btnAlterar').click(function() {
+
+		$('#nmTipoDespesa').val(nmTipoDespesa);
+		$('#dcTipoDespesa').val(dcTipoDespesa);
+
+		tpOperacao = 'A';
+		var myWindow = $("#wndOperacao");
+
+		myWindow.kendoWindow({
+			width: "650px",
+			maxHeight: 600,
+			position: {
+				top: 50,
+				left: "30%"
+			},
+			visible: false,
+			modal: true,
+			resizable: false,
+			actions: [
+				"Close"
+			]
+		
+		}).data("kendoWindow").open();	 
+		$('#wndOperacao_wnd_title').html('Alteração de Tipo de Despesa'); 
+		$('#btnOpTipoDespesa').text('Alterar');
+	});		
+	$('#btnExcluir').click(function(event) {
+		event.preventDefault();
+		var success = function(){
+			fnExcluiTipoDespesa();
+		}
+		var cancel = function(){
+			alert('Operação cancelada!');
+		};
+			showConfirmation("Excluir Tipo de Despesa " + nmTipoDespesa, "Confirma exclusão da Tipo de Despesa selecionada?", success, cancel);
+	});			
+
+	$('#btnExportar').unbind('click').on('click', function(){
+		fnExportaExcel($('#grdTipoDespesa'));
+	});	
+});// Final de Function
+
+fnAtualiza = function(){
+
+if (tpOperacao =='I')
+	fnIncluiTpDespesa()
+else
+	fnAlteraTpDespesa()
+
+};
+
+
+// Fecha Popups
+$(".close-button").click(function(){
+// call 'close' method on nearest kendoWindow
+$(this).closest("[data-role=window]").data("kendoWindow").close();
+
+});	
+	  
+fnOnDataBound = function(arg){
+	$('#btnExportar').prop('disabled', false);	
+};	  
+
+fnOnChange = function(arg){
+	// Guarda dados da linha selecionada...
+	
+    var grid = $("#grdTipoDespesa").data("kendoGrid");
+    selectedGridItem = grid.dataItem(grid.select());
+	
+	cdTipoDespesa = selectedGridItem.codigo;
+	nmTipoDespesa = selectedGridItem.nmTipoDespesa;
+	dcTipoDespesa = selectedGridItem.dcTipoDespesa;
+	
+	$('#btnExcluir').prop('disabled', false);
+	$('#btnAlterar').prop('disabled', false);
+	
+};	  
+
+fnExcluiTipoDespesa = function(){
+	alert('Tipo de Despesa será Excluída!'); // URL de Exclusão
+};		
+
+function checkbox(ativo) {   
+  if (ativo == true) {
+    return '<input type="checkbox"  onclick="return false;" value="' + ativo + '" checked="checked" />';
+  } else {
+    return '<input type="checkbox"  onclick="return false;" value="' + ativo + '" />';
+  }
+};  
+$('#btnAjuda').unbind('click').click(function () {
+	var tour = new TipoDespesaHelp();
+	tour.iniciar();
+});
+
+fnMontaGrid = function(){
+	var dataSourceProj = new kendo.data.DataSource({
+			data: nDespesaTipo, //TipoDespesas,
+			pageSize: 10,
+			schema: {
+			  model: {
+				fields: {
+				codigo: { editable: false },
+				nmTipoDespesa:{ editable: false },
+				dcTipoDespesa: { editable: false },
+				ativo: { editable: false }
+				}
+			  }
+			}	
+		});		
+		
+		// Grid
+		kendo.culture("pt-BR");
+        // Grid de TipoDespesas
+        $("#grdTipoDespesa").kendoGrid({
+			dataSource: dataSourceProj,
+			//autoBind: false,
+            height: 455,
+            width: '50%',
+         //   groupable: true,
+            sortable: true,
+			filterable: true,
+			selectable: true,
+			columnMenu: true,
+            pageable: {
+                refresh: true,
+                pageSizes: true,
+                buttonCount: 5
+            },
+			change: fnOnChange,
+			dataBound: fnOnDataBound,						
+            columns: [
+				{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},				
+				//field: "Id",
+				field: "codigo",
+				hidden: true,
+                title: "Código", //"Código",
+               // width: 250,
+				attributes:{ class:"text-center" } 
+			},{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},				
+				//field: "Id",
+				field: "nmTipoDespesa",
+				//hidden: true,
+                title: "Nome", //"Código",
+                width: 250,
+				attributes:{ class:"text-center" } 
+			},  
+			{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},	
+				attributes: {
+						style: "font-weight: bold; text-align:left; vertical-align:middle;"
+						},	
+			 //   field: "Nome",
+			 field: "dcTipoDespesa",
+                title: "Descrição", //"Nome",
+                width: 300
+            },
+			{
+				headerAttributes: {
+						style: "font-weight: bold; text-align:center; vertical-align:middle;"
+						},				
+				template: "#= checkbox(ativo)#", 
+				width: 110, title: "Ativo",
+				attributes:{ class:"text-center" } 
+			}
+		]
+        });		
+};
+
+fnIncluiTpDespesa = function(){
+		
+			//Capturar os valores do formulário..
+			nmTipoDespesa = $('#nmTipoDespesa').val();
+			dcTipoDespesa	 = $('#dcTipoDespesa').val();
+			
+			//JSON
+			var despesaTipo = {name: nmTipoDespesa,
+						       descricao: dcTipoDespesa,
+						       ativo: true};
+			console.log(despesaTipo);
+			
+			var tx = db.transaction(["despesasTipo"], "readwrite");
+			var despesaTipoStore = tx.objectStore("despesasTipo");
+			despesaTipoStore.put(despesaTipo);
+
+			fnRecuperaDados();
+
+			$("#frmTipoDespesa .close-button").click();
+			$("#frmTipoDespesa").trigger('reset');
+		
+};
+
+fnAlteraTpDespesa = function(){
+
+
+	nmTipoDespesa = $('#nmTipoDespesa').val();
+	dcTipoDespesa	 = $('#dcTipoDespesa').val();
+
+	var tx = db.transaction(["despesasTipo"], "readwrite");
+	var despesaTipoStore = tx.objectStore("despesasTipo");
+
+	var request = despesaTipoStore.get(cdTipoDespesa);
+
+	request.onerror = function(event) {
+  		alert('Registro não encontrado');
+	};
+	request.onsuccess = function(event) {
+		// Get the old value that we want to update
+		var data = event.target.result;
+		console.log(data);
+		// update the value(s) in the object that you want to change
+		data.name = nmTipoDespesa;
+		data.descricao = dcTipoDespesa;
+
+		// Put this updated object back into the database.
+		var requestUpdate = despesaTipoStore.put(data);
+		requestUpdate.onerror = function(event) {
+			alert('Erro');
+		};
+		requestUpdate.onsuccess = function(event) {
+			$("#frmTipoDespesa .close-button").click();
+			$("#frmTipoDespesa").trigger('reset');
+			fnRecuperaDados();
+		};
+	};
+
+}
+</script>
+</html>
