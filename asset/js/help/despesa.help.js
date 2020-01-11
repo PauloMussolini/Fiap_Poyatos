@@ -1,4 +1,4 @@
-function TipoDespesaHelp() {
+function DespesaHelp() {
 
     var $this = this;
 
