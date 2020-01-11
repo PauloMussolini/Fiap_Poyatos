@@ -370,15 +370,17 @@ fnOnChange = function(arg){
 
 fnExcluiDespesa = function(){
 	alert('Despesa será Excluída!'); // URL de Exclusão
+
+	var request = db.transaction(["despesas"], "readwrite")
+                .objectStore("despesas")
+                .delete(cdDespesa);
+request.onsuccess = function(event) {
+  fnRecuperaDados();
+};
+
 };		
 
-function checkbox(ativo) {   
-  if (ativo == true) {
-    return '<input type="checkbox"  onclick="return false;" value="' + ativo + '" checked="checked" />';
-  } else {
-    return '<input type="checkbox"  onclick="return false;" value="' + ativo + '" />';
-  }
-};  
+
 $('#btnAjuda').unbind('click').click(function () {
 	var tour = new DespesaHelp();
 	tour.iniciar();
